@@ -157,6 +157,10 @@ function resolveTypeImpl(
     )
 
     const mapType = types.map[format || "null"] || types.map.null
+    if (!mapType) {
+      throw new Error(`types map doesn't include \`${format}\` (got \`${JSON.stringify(mapType)}\`). ` +
+        `\`types.map = ${JSON.stringify(types.map)}\``)
+    }
 
     candidate = mapType
       .replace("{key}", types["string"][format || "null"] || types["string"]["null"])
