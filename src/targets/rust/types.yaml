@@ -17,10 +17,12 @@ number:
   float: f32
   double: f64
 boolean:
-  null: Bool
+  null: bool
 array: "Vec<{value}>"
-map: "BTreeMap<{key}, {value}>"
-set: "HashSet<{value}>"
+map:
+  null: "BTreeMap<{key}, {value}>"
+set:
+  null: "HashSet<{value}>"
 null: ()
 object:
   null: Any
