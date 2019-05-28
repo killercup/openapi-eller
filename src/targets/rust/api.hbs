@@ -2,12 +2,14 @@
 
 use std::collections::BTreeMap;
 use url::Url;
+use serde::{Deserialize, Serialize};
 
 {{#each models}}
 {{#if isEnum}}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum {{{name}}} {
 {{#each values}}
-    #[serde(value = "{{{value}}}")]
+    #[serde(rename = "{{{value}}}")]
     {{{key}}}{{#unless @last}},{{/unless}}
 {{/each}}
 }
@@ -17,22 +19,26 @@ pub struct {{{name}}} {
 {{#each fields}}
     {{#if key}}{{#unless isNameEqualToKey}}#[serde(rename = "{{{key}}}")]{{/unless}}
     {{/if}}{{#if format}}#[openapi(format = "{{{format}}}")]
-    {{/if}}pub {{{name}}}: {{{type}}}{{#unless @last}},{{/unless}}
+    {{/if}}{{#if (eq type "Url")}}#[serde(with = "url_serde")]
+    {{/if}}pub {{{name}}}: {{#if (or isEnum isOneOf)}}{{{parentName}}}{{/if}}{{{type}}},
 {{/each}}
 }
 {{#each enums}}
 {{#if isEnum}}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum {{{../name}}}{{{name}}} {
 {{#each values}}
-    #[serde(value = "{{{value}}}")]
-    {{{key}}}{{#unless @last}},{{/unless}}
+    #[serde(rename = "{{{value}}}")]
+    {{{key}}},
 {{/each}}
 }
 {{/if}}
 {{#if isOneOf}}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum {{{../name}}}{{{name}}} {
 {{#each values}}
-    {{{key}}}({{{value}}}){{#unless @last}},{{/unless}}
+    #[serde(rename = "{{{value}}}")]
+    {{{key}}}({{{value}}}),
 {{/each}}
 }
 {{/if}}

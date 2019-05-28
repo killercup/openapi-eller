@@ -99,7 +99,7 @@ export abstract class Target {
     return this.cls(basename)
   }
 
-  enum(basename: string): string {
+  enum(basename: string, parentName?: string): string {
     return this.cls(basename)
   }
 }
@@ -189,6 +189,7 @@ export interface TargetField {
   rawType: string
   key: string
   fields: TargetFieldMap
+  parentName?: string
   doc: string | undefined
   isHashable: boolean
   isNested: boolean

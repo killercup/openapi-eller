@@ -194,7 +194,7 @@ export abstract class Visitor {
       let i = 0
       for (const s of iter) {
         this.walk(i)
-        this.walkSchema(s, schema, c)
+        this.walkSchema(s, parentSchema, c)
         i += 1
         this.unwalk()
       }
@@ -205,6 +205,7 @@ export abstract class Visitor {
       iterWalk("allOf", allOf)
     } else if (oneOf != null) {
       iterWalk("oneOf", oneOf)
+      //console.debug("oneOf", oneOf)
     } else if (anyOf != null) {
       iterWalk("anyOf", anyOf)
     } else {
@@ -218,6 +219,7 @@ export abstract class Visitor {
     if (properties != null) {
       this.walk("properties")
       for (const propertyKey in properties) {
+        //console.debug(propertyKey)
         this.walk(propertyKey)
         this.walkSchema(this.assertNotRef(properties[propertyKey]), schema, undefined)
         this.unwalk()
@@ -635,7 +637,7 @@ export class GeneratorVisitor extends Visitor {
     }
 
     if (schema.items) {
-          // Parent schema needs to be explicitly null, otherwise it crashes
+      // Parent schema needs to be explicitly null, otherwise it crashes
       this.visitSchema(schema.items, null, combiner)
     }
 
@@ -650,7 +652,7 @@ export class GeneratorVisitor extends Visitor {
       const childCtx = this.schemas.get(schema)
 
       if (childCtx == null) {
-        const newCtx = new SchemaContext(schema, this.path(), null, true)
+        const newCtx = new SchemaContext(schema, this.path(), combiner, true)
         parentCtx.children.set(schema, newCtx)
         this.schemas.set(schema, newCtx)
       } else {
@@ -773,7 +775,8 @@ export class ModelGenerator {
     ctx: SchemaContext,
     schema: SchemaObject,
     propertySchema: SchemaObject,
-    key: string
+    key: string,
+    parentName?: string
   ): TargetField {
     const baseName = propertySchema.title || key
     const propertySchemaCtx = this.visitor.schemas.get(propertySchema)
@@ -791,6 +794,7 @@ export class ModelGenerator {
       rawType,
       key,
       fields,
+      parentName: parentName && this.target.enum(parentName),
       doc: this.target.fieldDoc(propertySchema),
       isHashable: this.target.isHashable(type),
       isNested: propertySchema.type === "object" && !propertySchema.additionalProperties,
@@ -806,14 +810,15 @@ export class ModelGenerator {
   private processFields(ctx: SchemaContext, schema: SchemaObject, properties: { [key: string]: SchemaObject }): TargetFieldMap {
     return Object.keys(properties).reduce((acc: TargetFieldMap, key: string) => {
       const propertySchema = properties[key]
-      acc[key] = this.processField(ctx, schema, propertySchema, key)
+      const parentName = _.chain(ctx.path).map(x => x.toString()).last().value()
+      acc[key] = this.processField(ctx, schema, propertySchema, key, parentName)
       return acc
     }, {})
   }
 
-  private processEnumField(schema: SchemaObject, key: string): EnumObject {
+  private processEnumField(schema: SchemaObject, key: string, parentName?: string): EnumObject {
     const baseName = schema.title || key
-    const name = this.target.enum(baseName)
+    const name = this.target.enum(baseName, parentName)
     const enumDef = schema.enum as any[]
 
     return {
@@ -843,18 +848,24 @@ export class ModelGenerator {
 
     if (!(oneOfProperties && discriminator)) {
       // tslint:disable-next-line:max-line-length
-      throw new Error(`Object with oneOf definition is lacking a discriminator: ${schema.key}`)
+      throw new Error(`Object with oneOf definition is lacking a discriminator: \`${oneOfProperties}\`, \`${prop.discriminator}\` in \`${JSON.stringify(schema)}\``)
     }
 
     const discriminatorValue = discriminator.propertyName
     const firstOne = oneOfProperties[discriminator.propertyName] as SchemaObject
+    if (!firstOne) {
+      // tslint:disable-next-line:max-line-length
+      throw new Error(`Could not get oneOf's discriminator property: \`${JSON.stringify(oneOfProperties)}\` doesn't have a \`${JSON.stringify(discriminator.propertyName)}\` key`)
+    }
     const interfaces: { [key: string]: string[] } = {}
 
     const values = oneOf.map((o) => {
+      // name of referenced type
+      const nestedInterface = `${_.get(o, ["properties", "@type", "enum", "0"]) || o.type}`
       const v = {
-        key: this.target.oneOfKey(o.key),
+        key: this.target.oneOfKey(nestedInterface),
         type: resolveType(this.target, ctx, schema, key, name, o),
-        value: o.key
+        value: this.target.oneOfKey(nestedInterface)
       }
 
       // Mark interfaces on targets
@@ -862,8 +873,7 @@ export class ModelGenerator {
         interfaces[v.type] = []
       }
 
-      // TODO: nestedInterface func
-      interfaces[v.type].push(`${this.target.cls(schema.key)}.${name}`)
+      interfaces[name].push(nestedInterface)
 
       return v
     })
@@ -875,7 +885,7 @@ export class ModelGenerator {
       type: EnumObjectType.OneOf,
       isOneOf: true,
       isEnum: false,
-      discriminatorType: firstOne.key,
+      discriminatorType: firstOne.name,
       discriminatorVariable: this.target.variable(discriminatorValue)
     }
 
@@ -960,7 +970,13 @@ export class ModelGenerator {
           enums[enumObj.name] = enumObj
         }
       } else if (childSchema.enum) {
-        const x = this.processEnumField(childSchema, childCtx.name(this.visitor))
+        const name = childCtx.name(this.visitor)
+        const parentName = _.chain(childCtx.path)
+          .dropRightWhile(x => (["properties", name].includes(x as string)))
+          .map(x => x.toString())
+          .last()
+          .value()
+        const x = this.processEnumField(childSchema, name, parentName)
         enums[x.name] = x
       }
     })
@@ -1020,7 +1036,7 @@ export class ModelGenerator {
       const { model, interfaces } = this.processSchema(ctx, schema)
 
       if (model != null) {
-          // TODO: unsure if this is even close
+        // TODO: unsure if this is even close
         const k = ctx.name(this.visitor)
         models[k] = model
       }
@@ -1032,6 +1048,10 @@ export class ModelGenerator {
 
     // Assign all interfaces to the relevant models
     _.forEach(modelInterfaces, (nestedInterfaces, k: string) => {
+      if (!models[k]) {
+        // throw new Error(`No key ${k} in ${JSON.stringify(Object.keys(models))}`)
+        return
+      }
       models[k].interfaces = nestedInterfaces
     })
 
