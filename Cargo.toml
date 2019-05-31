@@ -5,3 +5,14 @@ authors = ["Pascal Hertleif <pascal@technocreatives.com>"]
 edition = "2018"
 
 [dependencies]
+openapiv3 = "0.2.0"
+serde = "1.0.91"
+serde_yaml = "0.8.9"
+snafu = "0.4.1"
+log = "0.4.6"
+im = "13.0.0"
+
+[dev-dependencies]
+structopt = "0.2.16"
+quicli = "0.4.0"
+serde_json = "1.0.39"
