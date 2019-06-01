@@ -6,11 +6,15 @@ edition = "2018"
 
 [dependencies]
 openapiv3 = "0.2.0"
-serde = "1.0.91"
+serde = {version = "1.0", features = ["derive", "verbose-debug"]}
 serde_yaml = "0.8.9"
 snafu = "0.4.1"
 log = "0.4.6"
 im = "13.0.0"
+quote = { version = "0.6.12", optional = true }
+proc-macro2 = { version = "0.4.30", optional = true }
+syn = { version = "0.15.34", optional = true, features = ["parsing"] }
+heck = { version = "0.3.1", optional = true }
 
 [dev-dependencies]
 structopt = "0.2.16"
@@ -18,3 +22,16 @@ quicli = "0.4.0"
 serde_json = "1.0.39"
 strum = { git = "https://github.com/killercup/strum", branch = "feature/variant-names", version = "0.15.0" }
 strum_macros = { git = "https://github.com/killercup/strum", branch = "feature/variant-names", version = "0.15.0" }
+glob = "0.3.0"
+
+[features]
+default = ["rust"]
+rust = ["proc-macro2", "quote", "syn", "heck"]
+
+[replace]
+"serde_yaml:0.8.9" = { path = "vendor/serde-yaml" }
+"serde:1.0.92" = { path = "vendor/serde/serde" }
+"serde_derive:1.0.92" = { path = "vendor/serde/serde_derive" }
+# "strum_macros:0.15.0" = { path = "vendor/strum/strum_macros" }
+# "strum:0.15.0" = { path = "vendor/strum/strum" }
+"openapiv3:0.2.0" = { path = "vendor/openapiv3" }

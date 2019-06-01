@@ -49,8 +49,8 @@ impl fmt::Display for Identifier {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Schema {
-    id: Identifier,
-    data: JsonSchema,
+    pub id: Identifier,
+    pub data: JsonSchema,
 }
 
 #[derive(Debug, Clone, Snafu)]
