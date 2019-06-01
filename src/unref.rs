@@ -1,5 +1,5 @@
 use json_pointer::JsonPointer;
-use openapiv3::{OpenAPI, ReferenceOr, Schema};
+use openapiv3::{OpenAPI, ReferenceOr, Schema as JsonSchema};
 use snafu::{OptionExt, ResultExt, Snafu};
 use std::str::FromStr;
 
@@ -7,8 +7,8 @@ pub trait Unref<T> {
     fn unref<'b>(&self, all: &'b OpenAPI) -> Result<T, Error>;
 }
 
-impl Unref<Schema> for ReferenceOr<Schema> {
-    fn unref<'b>(&self, all: &'b OpenAPI) -> Result<Schema, Error> {
+impl Unref<JsonSchema> for ReferenceOr<JsonSchema> {
+    fn unref<'b>(&self, all: &'b OpenAPI) -> Result<JsonSchema, Error> {
         match self {
             ReferenceOr::Item(x) => Ok(x.clone()),
             ReferenceOr::Reference { reference, .. } => {
@@ -19,7 +19,19 @@ impl Unref<Schema> for ReferenceOr<Schema> {
     }
 }
 
-fn resolve<'a, 'b>(reference: &'a JsonPointer, all: &'b OpenAPI) -> Result<Schema, Error> {
+impl Unref<JsonSchema> for ReferenceOr<Box<JsonSchema>> {
+    fn unref<'b>(&self, all: &'b OpenAPI) -> Result<JsonSchema, Error> {
+        match self {
+            ReferenceOr::Item(x) => Ok(*x.clone()),
+            ReferenceOr::Reference { reference, .. } => {
+                let pointer = JsonPointer::from_str(&reference).context(InvalidJsonPointer)?;
+                resolve(&pointer, all)
+            }
+        }
+    }
+}
+
+fn resolve<'a, 'b>(reference: &'a JsonPointer, all: &'b OpenAPI) -> Result<JsonSchema, Error> {
     match &reference.components()[..] {
         &["components", "schemas", name] => {
             log::trace!("nice, {:?}", &reference.components()[2..]);

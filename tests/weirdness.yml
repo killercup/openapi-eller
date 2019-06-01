@@ -1,0 +1,29 @@
+openapi: 3.0.1
+info:
+  title: Weird tests cases
+  version: 0.1.0
+paths:
+  /:
+    get:
+      description: Foobar
+      responses:
+        "200":
+          description: All is well
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Foo"
+components:
+  schemas:
+    Foo:
+      type: object
+      properties:
+        fooifier:
+          type: string
+        content:
+          type: string

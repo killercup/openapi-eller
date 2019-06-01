@@ -1,9 +1,14 @@
 use crate::Unref;
 use im::{vector, Vector};
+use openapiv3::{OpenAPI, ReferenceOr, Schema as JsonSchema};
 use snafu::{OptionExt, ResultExt, Snafu};
-use std::{fmt, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+    sync::Arc,
+};
 
-pub fn collect_schemas(input: &openapiv3::OpenAPI) -> Result<Schemas, Error> {
+pub fn collect_schemas(input: &OpenAPI) -> Result<Schemas, Error> {
     let mut store = Schemas::default();
     let input = Arc::new(input.clone());
     input.collect_schema(
@@ -18,7 +23,7 @@ pub fn collect_schemas(input: &openapiv3::OpenAPI) -> Result<Schemas, Error> {
 
 #[derive(Clone, Default, Debug)]
 pub struct Schemas {
-    data: std::collections::HashMap<Identifier, Schema>,
+    pub(crate) data: HashMap<Identifier, Schema>,
 }
 
 impl Schemas {
@@ -28,9 +33,9 @@ impl Schemas {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct Identifier {
+pub(crate) struct Identifier {
     namespace: Vector<String>,
-    name: String,
+    pub(crate) name: String,
 }
 
 impl fmt::Display for Identifier {
@@ -43,9 +48,9 @@ impl fmt::Display for Identifier {
 }
 
 #[derive(Clone, Debug)]
-struct Schema {
+pub(crate) struct Schema {
     id: Identifier,
-    data: openapiv3::Schema,
+    data: JsonSchema,
 }
 
 #[derive(Debug, Clone, Snafu)]
@@ -53,7 +58,7 @@ pub enum Error {
     #[snafu(display("Cannot infer name from namespace"))]
     CannotInferNameFromNamespace {
         namespace: Vector<String>,
-        schema: openapiv3::Schema,
+        schema: JsonSchema,
     },
     #[snafu(display("Cannot resolve reference"))]
     CannotUnref { source: crate::unref::Error },
@@ -66,7 +71,7 @@ trait Visitor {
 #[derive(Clone, Debug)]
 struct VisitorContext {
     namespace: Vector<String>,
-    all: Arc<openapiv3::OpenAPI>,
+    all: Arc<OpenAPI>,
 }
 
 impl VisitorContext {
@@ -89,7 +94,7 @@ impl VisitorContext {
     }
 }
 
-impl Visitor for openapiv3::OpenAPI {
+impl Visitor for OpenAPI {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
@@ -105,7 +110,7 @@ impl Visitor for openapiv3::OpenAPI {
     }
 }
 
-impl Visitor for openapiv3::ReferenceOr<openapiv3::Schema> {
+impl Visitor for ReferenceOr<JsonSchema> {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
@@ -118,39 +123,52 @@ impl Visitor for openapiv3::ReferenceOr<openapiv3::Schema> {
     }
 }
 
-impl Visitor for openapiv3::ReferenceOr<openapiv3::PathItem> {
+impl Visitor for ReferenceOr<Box<JsonSchema>> {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
         context: &VisitorContext,
     ) -> Result<(), Error> {
-        if let openapiv3::ReferenceOr::Item(item) = self {
+        self.unref(&context.all)
+            .context(CannotUnref)?
+            .collect_schema(&mut store, context)?;
+        Ok(())
+    }
+}
+
+impl Visitor for ReferenceOr<openapiv3::PathItem> {
+    fn collect_schema(
+        &self,
+        mut store: &mut Schemas,
+        context: &VisitorContext,
+    ) -> Result<(), Error> {
+        if let ReferenceOr::Item(item) = self {
             item.collect_schema(&mut store, context)?;
         }
         Ok(())
     }
 }
 
-impl Visitor for openapiv3::ReferenceOr<openapiv3::Response> {
+impl Visitor for ReferenceOr<openapiv3::Response> {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
         context: &VisitorContext,
     ) -> Result<(), Error> {
-        if let openapiv3::ReferenceOr::Item(item) = self {
+        if let ReferenceOr::Item(item) = self {
             item.collect_schema(&mut store, context)?;
         }
         Ok(())
     }
 }
 
-impl Visitor for openapiv3::ReferenceOr<openapiv3::MediaType> {
+impl Visitor for ReferenceOr<openapiv3::MediaType> {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
         context: &VisitorContext,
     ) -> Result<(), Error> {
-        if let openapiv3::ReferenceOr::Item(item) = self {
+        if let ReferenceOr::Item(item) = self {
             item.collect_schema(&mut store, context)?;
         }
         Ok(())
@@ -202,7 +220,7 @@ impl Visitor for openapiv3::Responses {
         }
 
         for (name, response) in &self.responses {
-            response.collect_schema(&mut store, &context.sub_namespace(name))?;
+            response.collect_schema(&mut store, &context.sub_namespace(&name.to_string()))?;
         }
         Ok(())
     }
@@ -229,7 +247,7 @@ impl Visitor for openapiv3::MediaType {
     ) -> Result<(), Error> {
         if let Some(res) = &self.schema {
             // Skip top-level ref-schemas
-            if let openapiv3::ReferenceOr::Item(item) = res {
+            if let ReferenceOr::Item(item) = res {
                 item.collect_schema(&mut store, context)?;
             }
         }
@@ -237,7 +255,7 @@ impl Visitor for openapiv3::MediaType {
     }
 }
 
-impl Visitor for openapiv3::Schema {
+impl Visitor for JsonSchema {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
@@ -263,7 +281,7 @@ impl Visitor for openapiv3::Schema {
             },
         );
 
-        use openapiv3::SchemaKind::*;
+        use openapiv3::{ArrayType, ObjectType, SchemaKind::*, Type::*};
         match &self.schema_kind {
             OneOf { one_of } => {
                 for schema in one_of {
@@ -280,6 +298,19 @@ impl Visitor for openapiv3::Schema {
                     schema.collect_schema(&mut store, context)?;
                 }
             }
+            Type(Object(ObjectType {
+                properties,
+                additional_properties,
+                ..
+            })) => {
+                properties.collect_schema(&mut store, context)?;
+                if let Some(openapiv3::AdditionalProperties::Schema(r)) = additional_properties {
+                    r.collect_schema(&mut store, context)?;
+                }
+            }
+            Type(Array(ArrayType { items, .. })) => {
+                items.collect_schema(&mut store, context)?;
+            }
             _ => {}
         };
 
@@ -294,7 +325,7 @@ impl Visitor for openapiv3::Components {
                 namespace: context.namespace.clone(),
                 name: name.clone(),
             };
-            if let openapiv3::ReferenceOr::Item(schema) = schema {
+            if let ReferenceOr::Item(schema) = schema {
                 store.data.insert(
                     ident.clone(),
                     Schema {
@@ -304,6 +335,32 @@ impl Visitor for openapiv3::Components {
                 );
             } else {
                 log::debug!("reference schema collection not yet implemented (Components)");
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Visitor for BTreeMap<String, ReferenceOr<Box<JsonSchema>>> {
+    fn collect_schema(&self, store: &mut Schemas, context: &VisitorContext) -> Result<(), Error> {
+        for (name, schema) in self {
+            let ident = Identifier {
+                namespace: context.namespace.clone(),
+                name: name.clone(),
+            };
+            if let ReferenceOr::Item(schema) = schema {
+                store.data.insert(
+                    ident.clone(),
+                    Schema {
+                        id: ident,
+                        data: *schema.clone(),
+                    },
+                );
+            } else {
+                log::debug!(
+                    "reference schema collection not yet implemented ({:?})",
+                    context.namespace
+                );
             }
         }
         Ok(())
