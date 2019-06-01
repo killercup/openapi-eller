@@ -8,13 +8,14 @@ struct Cli {
     #[structopt(parse(from_os_str))]
     file: std::path::PathBuf,
     /// What to print
-    #[structopt(subcommand)]
+    #[structopt(long = "mode", default_value = "Mode::Schemas", raw(possible_values = "&Mode::variants()"))]
     mode: Mode,
     #[structopt(flatten)]
     verbosity: Verbosity,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, strum_macros::EnumString, strum_macros::EnumVariantNames)]
+#[strum(serialize_all = "kebab_case")]
 enum Mode {
     All,
     Schemas,
