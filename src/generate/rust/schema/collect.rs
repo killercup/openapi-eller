@@ -9,8 +9,9 @@ use crate::unref::Unref;
 use openapiv3::{ArrayType, ObjectType, SchemaKind, StringType, Type};
 use snafu::{ResultExt, Snafu};
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     convert::{TryFrom, TryInto},
+    sync::Arc,
 };
 
 type Types = HashMap<String, RustType>;
@@ -56,8 +57,22 @@ fn build_struct_schema(
         attributes: ContainerAttributes { rename },
     };
     let name = t.name();
-    types.insert(name.clone(), t);
-    Ok(name)
+    match types.entry(name.clone()) {
+        Entry::Occupied(entry) => {
+            log::debug!(
+                "{}",
+                Error::DuplicateTypeName {
+                    name: name.clone(),
+                    previous: format!("{:?}", entry.get()),
+                }
+            );
+            Ok(name)
+        }
+        Entry::Vacant(entry) => {
+            entry.insert(t);
+            Ok(name)
+        }
+    }
 }
 
 /// Returns name of newly inserted schema if there was one
@@ -68,13 +83,13 @@ fn build_nested_schema(
     source: &openapiv3::OpenAPI,
     mut types: &mut Types,
 ) -> Result<String, Error> {
+    let name = format!("{} {}", parent_name, schema_name);
     Ok(match &schema.schema_kind {
         SchemaKind::Type(Type::String(StringType { enumeration, .. })) => {
             if enumeration.is_empty() {
                 "String".to_owned()
             } else {
-                let new_enum =
-                    nested_string_enum(&format!("{} {}", parent_name, schema_name), &enumeration)?;
+                let new_enum = nested_string_enum(&name, &enumeration)?;
                 let new_enum_name = new_enum.name();
 
                 types.insert(new_enum_name.clone(), new_enum);
@@ -84,7 +99,7 @@ fn build_nested_schema(
         SchemaKind::Type(Type::Number(_)) => "f64".to_owned(),
         SchemaKind::Type(Type::Integer(_)) => "u64".to_owned(),
         SchemaKind::Type(Type::Object(obj)) => {
-            build_struct_schema(schema_name, &obj, source, &mut types)?
+            build_struct_schema(&name, &obj, source, &mut types)?
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
             // TODO: Figure out whether this is an existing schema and just
@@ -143,6 +158,8 @@ pub enum Error {
     UnrefError { source: crate::unref::Error },
     #[snafu(display("Error building Rust type: {}", source))]
     TemplateError { source: impls::Error },
+    #[snafu(display("Duplicate type name `{}`. Previous definition: `{}`", name, previous))]
+    DuplicateTypeName { name: String, previous: String },
     #[snafu(display("Sorry, {} is not implemented", info))]
     Unimplemented { info: String },
 }
