@@ -13,10 +13,7 @@ pub fn collect_schemas(input: &OpenAPI) -> Result<Schemas, Error> {
     let input = Arc::new(input.clone());
     input.collect_schema(
         &mut store,
-        &VisitorContext {
-            namespace: Vector::new(),
-            all: Arc::clone(&input),
-        },
+        &VisitorContext { namespace: Vector::new(), all: Arc::clone(&input) },
     )?;
     Ok(store)
 }
@@ -50,16 +47,13 @@ impl fmt::Display for Identifier {
 #[derive(Clone, Debug)]
 pub(crate) struct Schema {
     pub id: Identifier,
-    pub data: JsonSchema,
+    pub data: Arc<JsonSchema>,
 }
 
 #[derive(Debug, Clone, Snafu)]
 pub enum Error {
     #[snafu(display("Cannot infer name from namespace"))]
-    CannotInferNameFromNamespace {
-        namespace: Vector<String>,
-        schema: JsonSchema,
-    },
+    CannotInferNameFromNamespace { namespace: Vector<String>, schema: Arc<JsonSchema> },
     #[snafu(display("Cannot resolve reference"))]
     CannotUnref { source: crate::unref::Error },
 }
@@ -84,10 +78,7 @@ impl VisitorContext {
 
     pub fn maybe_replace_namespace(&self, path: Option<&String>) -> Self {
         if let Some(path) = path {
-            VisitorContext {
-                namespace: vector![path.to_string()],
-                all: Arc::clone(&self.all),
-            }
+            VisitorContext { namespace: vector![path.to_string()], all: Arc::clone(&self.all) }
         } else {
             self.clone()
         }
@@ -116,22 +107,7 @@ impl Visitor for ReferenceOr<JsonSchema> {
         mut store: &mut Schemas,
         context: &VisitorContext,
     ) -> Result<(), Error> {
-        self.unref(&context.all)
-            .context(CannotUnref)?
-            .collect_schema(&mut store, context)?;
-        Ok(())
-    }
-}
-
-impl Visitor for ReferenceOr<Box<JsonSchema>> {
-    fn collect_schema(
-        &self,
-        mut store: &mut Schemas,
-        context: &VisitorContext,
-    ) -> Result<(), Error> {
-        self.unref(&context.all)
-            .context(CannotUnref)?
-            .collect_schema(&mut store, context)?;
+        self.unref(&context.all).context(CannotUnref)?.collect_schema(&mut store, context)?;
         Ok(())
     }
 }
@@ -255,31 +231,20 @@ impl Visitor for openapiv3::MediaType {
     }
 }
 
-impl Visitor for JsonSchema {
+impl Visitor for Arc<JsonSchema> {
     fn collect_schema(
         &self,
         mut store: &mut Schemas,
         context: &VisitorContext,
     ) -> Result<(), Error> {
         let mut inner_namespace = context.namespace.clone();
-        let name = inner_namespace
-            .pop_back()
-            .with_context(|| CannotInferNameFromNamespace {
-                namespace: context.namespace.clone(),
-                schema: self.clone(),
-            })?;
-        let ident = Identifier {
-            namespace: inner_namespace,
-            name,
-        };
+        let name = inner_namespace.pop_back().with_context(|| CannotInferNameFromNamespace {
+            namespace: context.namespace.clone(),
+            schema: self.clone(),
+        })?;
+        let ident = Identifier { namespace: inner_namespace, name };
 
-        store.data.insert(
-            ident.clone(),
-            Schema {
-                id: ident.clone(),
-                data: self.clone(),
-            },
-        );
+        store.data.insert(ident.clone(), Schema { id: ident.clone(), data: self.clone() });
 
         use openapiv3::{ArrayType, ObjectType, SchemaKind::*, Type::*};
         match &self.schema_kind {
@@ -298,11 +263,7 @@ impl Visitor for JsonSchema {
                     schema.collect_schema(&mut store, context)?;
                 }
             }
-            Type(Object(ObjectType {
-                properties,
-                additional_properties,
-                ..
-            })) => {
+            Type(Object(ObjectType { properties, additional_properties, .. })) => {
                 properties.collect_schema(&mut store, context)?;
                 if let Some(openapiv3::AdditionalProperties::Schema(r)) = additional_properties {
                     r.collect_schema(&mut store, context)?;
@@ -321,18 +282,9 @@ impl Visitor for JsonSchema {
 impl Visitor for openapiv3::Components {
     fn collect_schema(&self, store: &mut Schemas, context: &VisitorContext) -> Result<(), Error> {
         for (name, schema) in &self.schemas {
-            let ident = Identifier {
-                namespace: context.namespace.clone(),
-                name: name.clone(),
-            };
+            let ident = Identifier { namespace: context.namespace.clone(), name: name.clone() };
             if let ReferenceOr::Item(schema) = schema {
-                store.data.insert(
-                    ident.clone(),
-                    Schema {
-                        id: ident,
-                        data: schema.clone(),
-                    },
-                );
+                store.data.insert(ident.clone(), Schema { id: ident, data: schema.clone() });
             } else {
                 log::debug!("reference schema collection not yet implemented (Components)");
             }
@@ -341,21 +293,12 @@ impl Visitor for openapiv3::Components {
     }
 }
 
-impl Visitor for BTreeMap<String, ReferenceOr<Box<JsonSchema>>> {
+impl Visitor for BTreeMap<String, ReferenceOr<JsonSchema>> {
     fn collect_schema(&self, store: &mut Schemas, context: &VisitorContext) -> Result<(), Error> {
         for (name, schema) in self {
-            let ident = Identifier {
-                namespace: context.namespace.clone(),
-                name: name.clone(),
-            };
+            let ident = Identifier { namespace: context.namespace.clone(), name: name.clone() };
             if let ReferenceOr::Item(schema) = schema {
-                store.data.insert(
-                    ident.clone(),
-                    Schema {
-                        id: ident,
-                        data: *schema.clone(),
-                    },
-                );
+                store.data.insert(ident.clone(), Schema { id: ident, data: schema.clone() });
             } else {
                 log::debug!(
                     "reference schema collection not yet implemented ({:?})",
