@@ -11,13 +11,14 @@ fn generate_test_cases() -> CliResult {
         let filename = filename?;
         let content = read_file(&filename)?;
         let openapi: openapiv3::OpenAPI = serde_yaml::from_str(&content)?;
-        let tokens = openapi_alors::generate::rust::types(&openapi)?;
+        let mut code = openapi_alors::generate::rust::types(&openapi)?;
+        code.push_str("fn main() {}");
 
         let name = filename
             .file_stem()
             .ok_or_else(|| format_err!("file `{}` has no extension", filename.display()))?;
 
-        write_to_file(target_dir.join(name).with_extension("rs"), &tokens.to_string())?;
+        write_to_file(target_dir.join(name).with_extension("rs"), &code)?;
     }
 
     let fmt = std::process::Command::new("cargo")
@@ -31,6 +32,8 @@ fn generate_test_cases() -> CliResult {
 
     let fmt = std::process::Command::new("cargo")
         .arg("check")
+        .arg("--all")
+        .arg("--all-targets")
         .current_dir("./tests/test-package/")
         .status()?;
 

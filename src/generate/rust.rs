@@ -15,6 +15,8 @@ pub fn types(source: &openapiv3::OpenAPI) -> Result<String, Error> {
     let rust_types: TokenStream = rust_types.iter().map(|(_name, def)| quote! { #def }).collect();
 
     let mut target = NamedTempFile::new().map_err(|e| Error::Rustfmt { info: e.to_string() })?;
+    writeln!(&mut target, "use serde::{{Serialize, Deserialize}};\n")
+        .map_err(|e| Error::Rustfmt { info: e.to_string() })?;
     writeln!(&mut target, "{}", rust_types).map_err(|e| Error::Rustfmt { info: e.to_string() })?;
 
     let fmt = std::process::Command::new("rustfmt")
