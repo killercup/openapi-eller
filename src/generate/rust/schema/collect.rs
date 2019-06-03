@@ -8,18 +8,23 @@ use super::{
 use crate::unref::Unref;
 use openapiv3::{ArrayType, ObjectType, SchemaKind, StringType, Type};
 use snafu::{ResultExt, Snafu};
-use std::convert::{TryFrom, TryInto};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
+
+type Types = HashMap<String, RustType>;
 
 pub fn build(
     schemas: &crate::schemas::Schemas,
     source: &openapiv3::OpenAPI,
-) -> Result<Vec<RustType>, Error> {
-    let mut res = Vec::new();
+) -> Result<Types, Error> {
+    let mut res = Types::new();
 
     for (schema_name, schema) in &schemas.data {
         match &schema.data.schema_kind {
-            SchemaKind::Type(Type::Object(ObjectType { properties, required, .. })) => {
-                build_struct_schema(&schema_name.name, &schema.data, source, &mut res)?;
+            SchemaKind::Type(Type::Object(obj)) => {
+                build_struct_schema(&schema_name.name, &obj, source, &mut res)?;
             }
             x => {
                 log::debug!("top level schema type {:?} is unimplemented, skipping!", x);
@@ -33,33 +38,25 @@ pub fn build(
 /// Returns name of newly inserted schema if there was one
 fn build_struct_schema(
     schema_name: &str,
-    schema: &openapiv3::Schema,
+    ObjectType { properties, required, .. }: &ObjectType,
     source: &openapiv3::OpenAPI,
-    mut types: &mut Vec<RustType>,
-) -> Result<Option<String>, Error> {
-    Ok(match &schema.schema_kind {
-        SchemaKind::Type(Type::Object(ObjectType { properties, required, .. })) => {
-            let mut fields = Vec::new();
-            for (prop_name, prop) in properties {
-                let prop = prop.unref(source).context(UnrefError)?;
-                fields.push(struct_field(&schema_name, &prop_name, &prop, source, &mut types)?);
-            }
+    mut types: &mut Types,
+) -> Result<String, Error> {
+    let mut fields = Vec::new();
+    for (prop_name, prop) in properties {
+        let prop = prop.unref(source).context(UnrefError)?;
+        fields.push(struct_field(&schema_name, &prop_name, &prop, source, &mut types)?);
+    }
 
-            let rename = Some(schema_name.to_owned());
-            let t = RustType::Struct {
-                name: TypeIdent::try_from(schema_name).context(TemplateError)?,
-                fields,
-                attributes: ContainerAttributes { rename },
-            };
-            let name = t.name();
-            types.push(t);
-            Some(name)
-        }
-        x => {
-            log::debug!("top level schema type {:?} is unimplemented, skipping!", x);
-            None
-        }
-    })
+    let rename = Some(schema_name.to_owned());
+    let t = RustType::Struct {
+        name: TypeIdent::try_from(schema_name).context(TemplateError)?,
+        fields,
+        attributes: ContainerAttributes { rename },
+    };
+    let name = t.name();
+    types.insert(name.clone(), t);
+    Ok(name)
 }
 
 /// Returns name of newly inserted schema if there was one
@@ -68,7 +65,7 @@ fn build_nested_schema(
     schema_name: &str,
     schema: &openapiv3::Schema,
     source: &openapiv3::OpenAPI,
-    mut types: &mut Vec<RustType>,
+    mut types: &mut Types,
 ) -> Result<String, Error> {
     Ok(match &schema.schema_kind {
         SchemaKind::Type(Type::String(StringType { enumeration, .. })) => {
@@ -79,16 +76,14 @@ fn build_nested_schema(
                     nested_string_enum(&format!("{} {}", parent_name, schema_name), &enumeration)?;
                 let new_enum_name = new_enum.name();
 
-                log::debug!("nested enum schema found, calling it `{}`", new_enum_name);
-                types.push(new_enum);
+                types.insert(new_enum_name.clone(), new_enum);
                 new_enum_name
             }
         }
         SchemaKind::Type(Type::Number(_)) => "f64".to_owned(),
         SchemaKind::Type(Type::Integer(_)) => "u64".to_owned(),
         SchemaKind::Type(Type::Object(obj)) => {
-            log::debug!("nested schemas are hard, skipping. `{:?}`", obj);
-            format!("std::collections::HashMap<String, Box<dyn std::any::Any>>")
+            build_struct_schema(schema_name, &obj, source, &mut types)?
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
             // TODO: Figure out whether this is an existing schema and just
@@ -102,7 +97,7 @@ fn build_nested_schema(
         x => {
             // return Err(Error::Unimplemented { info: format!("schema type {:?}", x) })
             log::debug!("schema type {:?} is unimplemented!", x);
-            "Box<dyn std::any::Any>".to_owned()
+            "serde_json::Value".to_owned()
         }
     })
 }
@@ -112,7 +107,7 @@ fn struct_field(
     name: &str,
     input: &openapiv3::Schema,
     source: &openapiv3::OpenAPI,
-    mut types: &mut Vec<RustType>,
+    mut types: &mut Types,
 ) -> Result<StructField, Error> {
     let type_name = build_nested_schema(parent_name, name, &input, source, &mut types)?;
 

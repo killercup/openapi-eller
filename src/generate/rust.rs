@@ -12,7 +12,7 @@ pub fn types(source: &openapiv3::OpenAPI) -> Result<String, Error> {
 
     let schemas = collect_schemas(source).context(SchemaError)?;
     let rust_types = schema::collect::build(&schemas, source).context(BuildRustError)?;
-    let rust_types: TokenStream = rust_types.iter().map(|x| quote! { #x }).collect();
+    let rust_types: TokenStream = rust_types.iter().map(|(_name, def)| quote! { #def }).collect();
 
     let mut target = NamedTempFile::new().map_err(|e| Error::Rustfmt { info: e.to_string() })?;
     writeln!(&mut target, "{}", rust_types).map_err(|e| Error::Rustfmt { info: e.to_string() })?;
