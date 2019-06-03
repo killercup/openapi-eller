@@ -7,11 +7,9 @@ use std::convert::TryFrom;
 impl RustType {
     pub fn name(&self) -> String {
         match self {
-            RustType::PlainEnum{name, ..} |
-            RustType::DataEnum{name, ..} |
-            RustType::Struct{name, ..} => (
-                name.ident.to_string()
-            ),
+            RustType::PlainEnum { name, .. }
+            | RustType::DataEnum { name, .. }
+            | RustType::Struct { name, .. } => (name.ident.to_string()),
         }
     }
 }

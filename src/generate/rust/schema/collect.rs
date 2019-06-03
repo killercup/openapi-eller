@@ -1,8 +1,8 @@
 use super::{
     impls,
     types::{
-        ContainerAttributes, FieldAttributes, RustType, StructField, TypeIdent, TypeName,
-        VariantAttributes, PlainEnumVariant,
+        ContainerAttributes, FieldAttributes, PlainEnumVariant, RustType, StructField, TypeIdent,
+        TypeName, VariantAttributes,
     },
 };
 use crate::unref::Unref;
@@ -19,19 +19,7 @@ pub fn build(
     for (schema_name, schema) in &schemas.data {
         match &schema.data.schema_kind {
             SchemaKind::Type(Type::Object(ObjectType { properties, required, .. })) => {
-                let mut fields = Vec::new();
-                for (prop_name, prop) in properties {
-                    let prop = prop.unref(source).context(UnrefError)?;
-                    fields.push(struct_field(&schema_name.name, prop_name, &prop, source, &mut res)?);
-                }
-
-                let rename = Some(schema_name.name.clone());
-                let t = RustType::Struct {
-                    name: TypeIdent::try_from(schema_name.name.as_str()).context(TemplateError)?,
-                    fields,
-                    attributes: ContainerAttributes { rename },
-                };
-                res.push(t);
+                build_struct_schema(&schema_name.name, &schema.data, source, &mut res)?;
             }
             x => {
                 log::debug!("top level schema type {:?} is unimplemented, skipping!", x);
@@ -42,20 +30,53 @@ pub fn build(
     Ok(res)
 }
 
-fn struct_field(
-    parent_name: &str,
-    name: &str,
-    input: &openapiv3::Schema,
+/// Returns name of newly inserted schema if there was one
+fn build_struct_schema(
+    schema_name: &str,
+    schema: &openapiv3::Schema,
     source: &openapiv3::OpenAPI,
     mut types: &mut Vec<RustType>,
-) -> Result<StructField, Error> {
-    let type_name = match &input.schema_kind {
+) -> Result<Option<String>, Error> {
+    Ok(match &schema.schema_kind {
+        SchemaKind::Type(Type::Object(ObjectType { properties, required, .. })) => {
+            let mut fields = Vec::new();
+            for (prop_name, prop) in properties {
+                let prop = prop.unref(source).context(UnrefError)?;
+                fields.push(struct_field(&schema_name, &prop_name, &prop, source, &mut types)?);
+            }
+
+            let rename = Some(schema_name.to_owned());
+            let t = RustType::Struct {
+                name: TypeIdent::try_from(schema_name).context(TemplateError)?,
+                fields,
+                attributes: ContainerAttributes { rename },
+            };
+            let name = t.name();
+            types.push(t);
+            Some(name)
+        }
+        x => {
+            log::debug!("top level schema type {:?} is unimplemented, skipping!", x);
+            None
+        }
+    })
+}
+
+/// Returns name of newly inserted schema if there was one
+fn build_nested_schema(
+    parent_name: &str,
+    schema_name: &str,
+    schema: &openapiv3::Schema,
+    source: &openapiv3::OpenAPI,
+    mut types: &mut Vec<RustType>,
+) -> Result<String, Error> {
+    Ok(match &schema.schema_kind {
         SchemaKind::Type(Type::String(StringType { enumeration, .. })) => {
             if enumeration.is_empty() {
                 "String".to_owned()
             } else {
                 let new_enum =
-                    nested_string_enum(&format!("{} {}", parent_name, name), &enumeration)?;
+                    nested_string_enum(&format!("{} {}", parent_name, schema_name), &enumeration)?;
                 let new_enum_name = new_enum.name();
 
                 log::debug!("nested enum schema found, calling it `{}`", new_enum_name);
@@ -70,7 +91,12 @@ fn struct_field(
             format!("std::collections::HashMap<String, Box<dyn std::any::Any>>")
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
-            format!("Vec<{}>", "Box<dyn std::any::Any>")
+            // TODO: Figure out whether this is an existing schema and just
+            // insert its type name here
+            let schema = items.unref(source).context(UnrefError)?;
+            let nested_schema_name =
+                build_nested_schema(parent_name, schema_name, &schema, source, &mut types)?;
+            format!("Vec<{}>", nested_schema_name)
         }
         SchemaKind::Type(Type::Boolean { .. }) => "bool".to_owned(),
         x => {
@@ -78,7 +104,17 @@ fn struct_field(
             log::debug!("schema type {:?} is unimplemented!", x);
             "Box<dyn std::any::Any>".to_owned()
         }
-    };
+    })
+}
+
+fn struct_field(
+    parent_name: &str,
+    name: &str,
+    input: &openapiv3::Schema,
+    source: &openapiv3::OpenAPI,
+    mut types: &mut Vec<RustType>,
+) -> Result<StructField, Error> {
+    let type_name = build_nested_schema(parent_name, name, &input, source, &mut types)?;
 
     Ok(StructField {
         name: name.try_into().context(TemplateError)?,
