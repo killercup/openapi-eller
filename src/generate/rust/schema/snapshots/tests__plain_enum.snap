@@ -1,10 +1,10 @@
 ---
-created: "2019-06-03T15:03:23.327004Z"
+created: "2019-06-03T21:30:16.807337Z"
 creator: insta@0.8.1
 source: src/generate/rust/schema/tests.rs
 expression: generate_rust(&schemas)?
 ---
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Foo {
     Bar,
 }

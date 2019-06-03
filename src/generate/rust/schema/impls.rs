@@ -25,7 +25,7 @@ impl ToTokens for RustType {
         match self {
             RustType::PlainEnum { name, variants, attributes, .. } => {
                 tokens.append_all(quote! {
-                    #[derive(Clone, Copy, Debug, Hash)]
+                    #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
                     #attributes
                     pub enum #name {
                         #(#variants),*
@@ -34,7 +34,7 @@ impl ToTokens for RustType {
             }
             RustType::DataEnum { name, variants, attributes, .. } => {
                 tokens.append_all(quote! {
-                    #[derive(Clone, Debug, Hash)]
+                    #[derive(Clone, Debug, Serialize, Deserialize)]
                     #attributes
                     pub enum #name {
                         #(#variants),*
@@ -43,7 +43,7 @@ impl ToTokens for RustType {
             }
             RustType::Struct { name, fields, attributes, .. } => {
                 tokens.append_all(quote! {
-                    #[derive(Clone, Debug, Hash)]
+                    #[derive(Clone, Debug, Serialize, Deserialize)]
                     #attributes
                     pub struct #name {
                         #(#fields),*
