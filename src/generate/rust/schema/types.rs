@@ -29,6 +29,7 @@ pub struct StructField {
     pub name: FieldName,
     pub attributes: FieldAttributes,
     pub type_name: TypeName,
+    pub optional: bool,
 }
 
 #[derive(Debug, Clone)]

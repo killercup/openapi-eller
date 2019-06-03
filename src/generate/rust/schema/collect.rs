@@ -45,7 +45,8 @@ fn build_struct_schema(
     let mut fields = Vec::new();
     for (prop_name, prop) in properties {
         let prop = prop.unref(source).context(UnrefError)?;
-        fields.push(struct_field(&schema_name, &prop_name, &prop, source, &mut types)?);
+        let optional = !required.contains(&prop_name);
+        fields.push(struct_field(&schema_name, &prop_name, &prop, optional, source, &mut types)?);
     }
 
     let rename = Some(schema_name.to_owned());
@@ -106,6 +107,7 @@ fn struct_field(
     parent_name: &str,
     name: &str,
     input: &openapiv3::Schema,
+    optional: bool,
     source: &openapiv3::OpenAPI,
     mut types: &mut Types,
 ) -> Result<StructField, Error> {
@@ -115,6 +117,7 @@ fn struct_field(
         name: name.try_into().context(TemplateError)?,
         type_name: TypeName::try_from(type_name.as_str()).context(TemplateError)?,
         attributes: FieldAttributes { rename: Some(name.to_owned()) },
+        optional,
     })
 }
 

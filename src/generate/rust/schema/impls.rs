@@ -104,7 +104,14 @@ impl ToTokens for StructField {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let attrs = &self.attributes;
         let name = &self.name;
-        let type_name = &self.type_name;
+        let type_name = {
+            let name = &self.type_name;
+            if self.optional {
+                quote! { Option < #name > }
+            } else {
+                quote! { #name }
+            }
+        };
 
         tokens.append_all(quote! {
             #attrs
