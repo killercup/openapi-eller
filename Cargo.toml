@@ -5,7 +5,7 @@ authors = ["Pascal Hertleif <pascal@technocreatives.com>"]
 edition = "2018"
 
 [dependencies]
-openapiv3 = "0.2.0"
+openapiv3 = { version = "0.2.0", git = "https://github.com/killercup/openapiv3", branch = "aaaaaarc" }
 serde = {version = "1.0", features = ["derive", "verbose-debug"]}
 serde_yaml = "0.8.9"
 snafu = "0.4.1"
