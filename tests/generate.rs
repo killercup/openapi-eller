@@ -3,6 +3,7 @@ use quicli::prelude::*;
 
 #[test]
 fn generate_test_cases() -> CliResult {
+    let _ = env_logger::builder().is_test(true).filter(None, log::LevelFilter::Debug).try_init();
     let target_dir = std::path::PathBuf::from("./tests/test-package/examples");
     create_dir(&target_dir)?;
 

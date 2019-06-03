@@ -1,0 +1,11 @@
+---
+created: "2019-06-03T12:48:40.099693Z"
+creator: insta@0.8.1
+source: src/generate/rust/schema/tests.rs
+expression: generate_rust(&schemas)?
+---
+pub struct Foo {
+    one: String,
+    two: std::path::PathBuf,
+}
+

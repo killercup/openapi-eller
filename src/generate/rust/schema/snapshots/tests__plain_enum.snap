@@ -1,0 +1,10 @@
+---
+created: "2019-06-03T12:34:12.530984Z"
+creator: insta@0.8.1
+source: src/generate/rust/schema/tests.rs
+expression: read_file(&target.path())?
+---
+pub enum Foo {
+    Bar,
+}
+
