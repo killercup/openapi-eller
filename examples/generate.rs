@@ -47,9 +47,7 @@ fn main() -> CliResult {
 
             write_to_file(&target_file, &tokens.to_string())?;
 
-            let fmt = std::process::Command::new("rustfmt")
-                .arg(&target_file)
-                .status()?;
+            let fmt = std::process::Command::new("rustfmt").arg(&target_file).status()?;
 
             if !fmt.success() {
                 Err(format_err!("rustfmt failed"))?;

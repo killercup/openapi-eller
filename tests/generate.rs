@@ -17,16 +17,13 @@ fn generate_test_cases() -> CliResult {
             .file_stem()
             .ok_or_else(|| format_err!("file `{}` has no extension", filename.display()))?;
 
-        write_to_file(
-            target_dir.join(name).with_extension("rs"),
-            &tokens.to_string(),
-        )?;
+        write_to_file(target_dir.join(name).with_extension("rs"), &tokens.to_string())?;
     }
 
     let fmt = std::process::Command::new("cargo")
-            .arg("fmt")
-            .current_dir("./tests/test-package/")
-            .status()?;
+        .arg("fmt")
+        .current_dir("./tests/test-package/")
+        .status()?;
 
     if !fmt.success() {
         Err(format_err!("cargo fmt failed"))?;

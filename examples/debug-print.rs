@@ -8,7 +8,11 @@ struct Cli {
     #[structopt(parse(from_os_str))]
     file: std::path::PathBuf,
     /// What to print
-    #[structopt(long = "mode", default_value = "Mode::Schemas", raw(possible_values = "&Mode::variants()"))]
+    #[structopt(
+        long = "mode",
+        default_value = "Mode::Schemas",
+        raw(possible_values = "&Mode::variants()")
+    )]
     mode: Mode,
     #[structopt(flatten)]
     verbosity: Verbosity,
@@ -32,10 +36,7 @@ fn main() -> CliResult {
         Mode::All => println!("{:#?}", openapi),
         Mode::Schemas => println!(
             "{}",
-            openapi_alors::collect_schemas(&openapi)?
-                .keys()
-                .collect::<Vec<_>>()
-                .join("\n")
+            openapi_alors::collect_schemas(&openapi)?.keys().collect::<Vec<_>>().join("\n")
         ),
         Mode::SchemasFull => println!("{:#?}", openapi_alors::collect_schemas(&openapi)?),
     }
