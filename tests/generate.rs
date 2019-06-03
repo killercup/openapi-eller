@@ -29,5 +29,14 @@ fn generate_test_cases() -> CliResult {
         Err(format_err!("cargo fmt failed"))?;
     }
 
+    let fmt = std::process::Command::new("cargo")
+        .arg("check")
+        .current_dir("./tests/test-package/")
+        .status()?;
+
+    if !fmt.success() {
+        Err(format_err!("cargo check failed"))?;
+    }
+
     Ok(())
 }
