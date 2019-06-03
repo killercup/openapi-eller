@@ -4,6 +4,18 @@ use quote::{quote, ToTokens, TokenStreamExt};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 
+impl RustType {
+    pub fn name(&self) -> String {
+        match self {
+            RustType::PlainEnum{name, ..} |
+            RustType::DataEnum{name, ..} |
+            RustType::Struct{name, ..} => (
+                name.ident.to_string()
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Snafu)]
 pub enum Error {
     #[snafu(display("You've synned at `{}`: {}", token, source))]
