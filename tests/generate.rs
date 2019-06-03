@@ -11,8 +11,7 @@ fn generate_test_cases() -> CliResult {
         let filename = filename?;
         let content = read_file(&filename)?;
         let openapi: openapiv3::OpenAPI = serde_yaml::from_str(&content)?;
-        let schemas = openapi_alors::collect_schemas(&openapi)?;
-        let tokens = openapi_alors::generate::rust::types(&schemas, &openapi)?;
+        let tokens = openapi_alors::generate::rust::types(&openapi)?;
 
         let name = filename
             .file_stem()

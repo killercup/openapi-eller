@@ -104,7 +104,11 @@ impl<'a> TryFrom<&'a str> for TypeIdent {
     type Error = Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let ident = syn::parse_str(value).with_context(|| SynError { token: value.to_string() })?;
+        use heck::CamelCase;
+
+        let sanitized_ident = value.replace("@", "at_").replace("/", "_").to_camel_case();
+        let ident = syn::parse_str(&sanitized_ident)
+            .with_context(|| SynError { token: value.to_string() })?;
 
         Ok(TypeIdent { raw: value.to_string(), ident })
     }
@@ -122,7 +126,7 @@ impl<'a> TryFrom<&'a str> for FieldName {
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         use heck::SnakeCase;
 
-        let sanitized_ident = value.replace("@", "at_").to_snake_case();
+        let sanitized_ident = value.replace("@", "at_").replace("/", "_").to_snake_case();
         let ident = syn::parse_str(&sanitized_ident)
             .or_else(|_| syn::parse_str(&format!("r#{}", sanitized_ident)))
             .with_context(|| SynError { token: value.to_string() })?;

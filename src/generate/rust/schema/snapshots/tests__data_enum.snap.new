@@ -1,0 +1,11 @@
+---
+created: "2019-06-03T14:41:41.511935Z"
+creator: insta@0.8.1
+source: src/generate/rust/schema/tests.rs
+expression: generate_rust(&schemas)?
+---
+pub enum Foo {
+    Bar { one: String, two: StdPathPathBuf },
+    Baz(StdBorrowCowStaticStr),
+}
+
