@@ -16,8 +16,8 @@ impl RustType {
 
 #[derive(Debug, Clone, Snafu)]
 pub enum Error {
-    #[snafu(display("You've synned at `{}`: {}", token, source))]
-    SynError { token: String, source: syn::Error },
+    #[snafu(display("While trying to build {} you've synned at `{}`: {}", target, token, source))]
+    SynError { token: String, target: String, source: syn::Error },
 }
 
 impl ToTokens for RustType {
@@ -127,10 +127,12 @@ impl<'a> TryFrom<&'a str> for TypeIdent {
         use heck::CamelCase;
 
         let sanitized_ident = value.replace("@", "at_").replace("/", "_").to_camel_case();
-        let ident = syn::parse_str(&sanitized_ident)
-            .with_context(|| SynError { token: value.to_string() })?;
+        let ident = syn::parse_str(&sanitized_ident).with_context(|| SynError {
+            target: "TypeIdent".to_string(),
+            token: value.to_string(),
+        })?;
 
-        Ok(TypeIdent { raw: value.to_string(), ident })
+        Ok(TypeIdent { /* raw: value.to_string(), */ ident })
     }
 }
 
@@ -149,9 +151,12 @@ impl<'a> TryFrom<&'a str> for FieldName {
         let sanitized_ident = value.replace("@", "at_").replace("/", "_").to_snake_case();
         let ident = syn::parse_str(&sanitized_ident)
             .or_else(|_| syn::parse_str(&format!("r#{}", sanitized_ident)))
-            .with_context(|| SynError { token: value.to_string() })?;
+            .with_context(|| SynError {
+                target: "FieldName".to_string(),
+                token: value.to_string(),
+            })?;
 
-        Ok(FieldName { raw: value.to_string(), ident })
+        Ok(FieldName { /* raw: value.to_string(), */ ident })
     }
 }
 
@@ -165,9 +170,12 @@ impl<'a> TryFrom<&'a str> for TypeName {
     type Error = Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let ident = syn::parse_str(value).with_context(|| SynError { token: value.to_string() })?;
+        let ident = syn::parse_str(value).with_context(|| SynError {
+            target: "TypeName".to_string(),
+            token: value.to_string(),
+        })?;
 
-        Ok(TypeName { raw: value.to_string(), ident })
+        Ok(TypeName { /* raw: value.to_string(), */ ident })
     }
 }
 

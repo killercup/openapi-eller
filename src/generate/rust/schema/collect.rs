@@ -59,13 +59,16 @@ fn build_struct_schema(
     let name = t.name();
     match types.entry(name.clone()) {
         Entry::Occupied(entry) => {
-            log::debug!(
-                "{}",
-                Error::DuplicateTypeName {
-                    name: name.clone(),
-                    previous: format!("{:?}", entry.get()),
-                }
-            );
+            if *entry.get() != t {
+                log::debug!(
+                    "{}",
+                    Error::DuplicateTypeName {
+                        name: name.clone(),
+                        previous: format!("{:?}", entry.get()),
+                        new: format!("{:?}", t),
+                    }
+                );
+            }
             Ok(name)
         }
         Entry::Vacant(entry) => {
@@ -83,7 +86,8 @@ fn build_nested_schema(
     source: &openapiv3::OpenAPI,
     mut types: &mut Types,
 ) -> Result<String, Error> {
-    let name = format!("{} {}", parent_name, schema_name);
+    let name = format!("{}::{}", parent_name, schema_name);
+
     Ok(match &schema.schema_kind {
         SchemaKind::Type(Type::String(StringType { enumeration, .. })) => {
             if enumeration.is_empty() {
@@ -99,6 +103,7 @@ fn build_nested_schema(
         SchemaKind::Type(Type::Number(_)) => "f64".to_owned(),
         SchemaKind::Type(Type::Integer(_)) => "u64".to_owned(),
         SchemaKind::Type(Type::Object(obj)) => {
+            log::trace!("nested object {:?}", obj);
             build_struct_schema(&name, &obj, source, &mut types)?
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
@@ -131,7 +136,7 @@ fn struct_field(
     Ok(StructField {
         name: name.try_into().context(TemplateError)?,
         type_name: TypeName::try_from(type_name.as_str()).context(TemplateError)?,
-        attributes: FieldAttributes { rename: Some(name.to_owned()) },
+        attributes: FieldAttributes { rename: None },
         optional,
     })
 }
@@ -158,8 +163,13 @@ pub enum Error {
     UnrefError { source: crate::unref::Error },
     #[snafu(display("Error building Rust type: {}", source))]
     TemplateError { source: impls::Error },
-    #[snafu(display("Duplicate type name `{}`. Previous definition: `{}`", name, previous))]
-    DuplicateTypeName { name: String, previous: String },
+    #[snafu(display(
+        "Duplicate type name `{}`. Previous definition:\n{}\nNew definition:\n{}",
+        name,
+        previous,
+        new
+    ))]
+    DuplicateTypeName { name: String, previous: String, new: String },
     #[snafu(display("Sorry, {} is not implemented", info))]
     Unimplemented { info: String },
 }
