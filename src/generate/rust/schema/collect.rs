@@ -6,7 +6,7 @@ use super::{
     },
 };
 use crate::unref::Unref;
-use openapiv3::{ArrayType, ObjectType, SchemaKind, StringType, Type};
+use openapiv3::{AdditionalProperties, ArrayType, ObjectType, SchemaKind, StringType, Type};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -104,7 +104,22 @@ fn build_nested_schema(
         SchemaKind::Type(Type::Integer(_)) => "u64".to_owned(),
         SchemaKind::Type(Type::Object(obj)) => {
             log::trace!("nested object {:?}", obj);
-            build_struct_schema(&name, &obj, source, &mut types)?
+            if obj.properties.is_empty() {
+                match &obj.additional_properties {
+                    Some(AdditionalProperties::Any(any)) => {
+                        "std::collections::BTreeMap<String, serde_json::Value>".to_owned()
+                    }
+                    Some(AdditionalProperties::Schema(schema)) => {
+                        let schema = schema.unref(source).context(UnrefError)?;
+                        let value_type =
+                            build_nested_schema(&name, "Additional", &schema, source, &mut types)?;
+                        format!("std::collections::BTreeMap<String, {}>", value_type)
+                    }
+                    None => build_struct_schema(&name, &obj, source, &mut types)?,
+                }
+            } else {
+                build_struct_schema(&name, &obj, source, &mut types)?
+            }
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
             // TODO: Figure out whether this is an existing schema and just
