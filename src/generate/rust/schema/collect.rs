@@ -5,12 +5,18 @@ use super::{
         TypeName, VariantAttributes,
     },
 };
-use crate::unref::Unref;
-use openapiv3::{AdditionalProperties, ArrayType, ObjectType, SchemaKind, StringType, Type};
+use crate::{
+    json_pointer::{JsonPointer, ParseJsonPointerError},
+    unref::Unref,
+};
+use openapiv3::{
+    AdditionalProperties, ArrayType, ObjectType, ReferenceOr, SchemaKind, StringType, Type,
+};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{hash_map::Entry, HashMap},
     convert::{TryFrom, TryInto},
+    str::FromStr,
     sync::Arc,
 };
 
@@ -110,10 +116,19 @@ fn build_nested_schema(
                         "std::collections::BTreeMap<String, serde_json::Value>".to_owned()
                     }
                     Some(AdditionalProperties::Schema(schema)) => {
-                        let schema = schema.unref(source).context(UnrefError)?;
-                        let value_type =
-                            build_nested_schema(&name, "Additional", &schema, source, &mut types)?;
-                        format!("std::collections::BTreeMap<String, {}>", value_type)
+                        let value_type_name = match &**schema {
+                            ReferenceOr::Reference { reference, .. } => {
+                                type_name_from_ref(&reference)?
+                            }
+                            ReferenceOr::Item(schema) => build_nested_schema(
+                                &name,
+                                "Additional",
+                                &schema,
+                                source,
+                                &mut types,
+                            )?,
+                        };
+                        format!("std::collections::BTreeMap<String, {}>", value_type_name)
                     }
                     None => build_struct_schema(&name, &obj, source, &mut types)?,
                 }
@@ -122,11 +137,12 @@ fn build_nested_schema(
             }
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
-            // TODO: Figure out whether this is an existing schema and just
-            // insert its type name here
-            let schema = items.unref(source).context(UnrefError)?;
-            let nested_schema_name =
-                build_nested_schema(parent_name, schema_name, &schema, source, &mut types)?;
+            let nested_schema_name = match items {
+                ReferenceOr::Reference { reference, .. } => type_name_from_ref(&reference)?,
+                ReferenceOr::Item(schema) => {
+                    build_nested_schema(parent_name, schema_name, &schema, source, &mut types)?
+                }
+            };
             format!("Vec<{}>", nested_schema_name)
         }
         SchemaKind::Type(Type::Boolean { .. }) => "bool".to_owned(),
@@ -136,6 +152,15 @@ fn build_nested_schema(
             "serde_json::Value".to_owned()
         }
     })
+}
+
+fn type_name_from_ref(r: &str) -> Result<String, Error> {
+    let reference = JsonPointer::from_str(&r).context(InvalidJsonPointer)?;
+
+    match &reference.components()[..] {
+        &["components", "schemas", name] => Ok(name.to_string()),
+        _ => return Err(Error::UnsupportedReference { reference: reference.clone() }),
+    }
 }
 
 fn struct_field(
@@ -185,6 +210,10 @@ pub enum Error {
         new
     ))]
     DuplicateTypeName { name: String, previous: String, new: String },
+    #[snafu(display("Invalid JSON pointer as reference"))]
+    InvalidJsonPointer { source: ParseJsonPointerError },
+    #[snafu(display("Reference location `{:?}` currently not supported", reference))]
+    UnsupportedReference { reference: JsonPointer },
     #[snafu(display("Sorry, {} is not implemented", info))]
     Unimplemented { info: String },
 }

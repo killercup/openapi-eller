@@ -1,4 +1,4 @@
-use json_pointer::JsonPointer;
+use crate::json_pointer::{JsonPointer, ParseJsonPointerError};
 use openapiv3::{OpenAPI, ReferenceOr, Schema as JsonSchema};
 use snafu::{OptionExt, ResultExt, Snafu};
 use std::{str::FromStr, sync::Arc};
@@ -41,7 +41,7 @@ fn resolve<'a, 'b>(reference: &'a JsonPointer, all: &'b OpenAPI) -> Result<Arc<J
 #[derive(Debug, Clone, Snafu)]
 pub enum Error {
     #[snafu(display("Invalid JSON pointer as reference"))]
-    InvalidJsonPointer { source: json_pointer::ParseJsonPointerError },
+    InvalidJsonPointer { source: ParseJsonPointerError },
     #[snafu(display("Reference location `{:?}` currently not supported", reference))]
     UnsupportedReference { reference: JsonPointer },
     #[snafu(display(
@@ -51,40 +51,4 @@ pub enum Error {
     NoComponentsDefinedInSchema { reference: JsonPointer },
     #[snafu(display("Referenced item `{:?}` could not be found", reference))]
     ReferenceNotFound { reference: JsonPointer },
-}
-
-mod json_pointer {
-    use snafu::{ensure, Snafu};
-    use std::str::FromStr;
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub struct JsonPointer {
-        components: Vec<String>,
-    }
-
-    impl JsonPointer {
-        pub fn components(&self) -> Vec<&str> {
-            self.components.iter().map(|x| x.as_str()).collect()
-        }
-    }
-
-    #[derive(Debug, Clone, Snafu)]
-    pub enum ParseJsonPointerError {
-        #[snafu(display(
-            "Only relative pointers supported, but `{}` doesn't start with a `#`",
-            original
-        ))]
-        NotRelative { original: String },
-    }
-
-    impl FromStr for JsonPointer {
-        type Err = ParseJsonPointerError;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            ensure!(s.starts_with("#/"), NotRelative { original: s.to_string() });
-            Ok(JsonPointer {
-                components: s.trim_start_matches("#/").split("/").map(|x| x.to_string()).collect(),
-            })
-        }
-    }
 }

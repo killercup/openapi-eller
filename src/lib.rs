@@ -1,4 +1,5 @@
 pub mod generate;
+mod json_pointer;
 mod schemas;
 mod unref;
 
