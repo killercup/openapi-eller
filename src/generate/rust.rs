@@ -1,7 +1,6 @@
 use snafu::{ResultExt, Snafu};
 
 mod schema;
-mod types;
 
 pub fn types(source: &openapiv3::OpenAPI) -> Result<String, Error> {
     use crate::collect_schemas;
