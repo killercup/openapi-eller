@@ -102,4 +102,3 @@ fn schema_ref() {
         crate::generate::rust::types(&api).unwrap()
     );
 }
-

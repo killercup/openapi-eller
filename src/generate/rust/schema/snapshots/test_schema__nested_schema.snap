@@ -1,5 +1,5 @@
 ---
-created: "2019-06-04T10:59:47.836909Z"
+created: "2019-06-04T11:44:29.168563Z"
 creator: insta@0.8.1
 source: src/generate/rust/schema/test_schema.rs
 expression: "crate::generate::rust::types(&api).unwrap()"
@@ -7,15 +7,15 @@ expression: "crate::generate::rust::types(&api).unwrap()"
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename = "Foo::bar")]
-pub struct FooBar {
-    #[serde(rename = "baz")]
-    baz: Option<String>,
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename = "Foo")]
 pub struct Foo {
     #[serde(rename = "bar")]
     bar: Option<FooBar>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "Foo::bar")]
+pub struct FooBar {
+    #[serde(rename = "baz")]
+    baz: Option<String>,
 }
 

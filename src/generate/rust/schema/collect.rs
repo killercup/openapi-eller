@@ -14,13 +14,13 @@ use openapiv3::{
 };
 use snafu::{ResultExt, Snafu};
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{btree_map::Entry, BTreeMap},
     convert::{TryFrom, TryInto},
     str::FromStr,
     sync::Arc,
 };
 
-type Types = HashMap<String, RustType>;
+type Types = BTreeMap<String, RustType>;
 
 pub fn build(
     schemas: &crate::schemas::Schemas,

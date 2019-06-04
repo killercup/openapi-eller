@@ -1,11 +1,17 @@
 ---
-created: "2019-06-04T11:01:11.472097Z"
+created: "2019-06-04T11:44:29.168568Z"
 creator: insta@0.8.1
 source: src/generate/rust/schema/test_schema.rs
 expression: "crate::generate::rust::types(&api).unwrap()"
 ---
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "Foo")]
+pub struct Foo {
+    #[serde(rename = "bar")]
+    bar: Option<FooBar>,
+}
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum FooBar {
     #[serde(rename = "lorem")]
@@ -14,11 +20,5 @@ pub enum FooBar {
     Ipsum,
     #[serde(rename = "dolor")]
     Dolor,
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename = "Foo")]
-pub struct Foo {
-    #[serde(rename = "bar")]
-    bar: Option<FooBar>,
 }
 
