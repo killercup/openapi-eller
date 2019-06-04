@@ -3,4 +3,7 @@ pub(crate) mod impls;
 pub(crate) mod types;
 
 #[cfg(test)]
-mod tests;
+mod test_types;
+
+#[cfg(test)]
+mod test_schema;

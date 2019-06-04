@@ -1,7 +1,7 @@
 ---
-created: "2019-06-03T21:30:16.807338Z"
+created: "2019-06-04T10:55:02.670827Z"
 creator: insta@0.8.1
-source: src/generate/rust/schema/tests.rs
+source: src/generate/rust/schema/test_types.rs
 expression: generate_rust(&schemas)?
 ---
 #[derive(Clone, Debug, Serialize, Deserialize)]
