@@ -14,18 +14,18 @@ fn simple_struct() -> CliResult {
         fields: vec![
             StructField {
                 name: "one".try_into()?,
-                attributes: FieldAttributes { rename: None },
+                attributes: FieldAttributes::default(),
                 type_name: "String".try_into()?,
                 optional: false,
             },
             StructField {
                 name: "two".try_into()?,
-                attributes: FieldAttributes { rename: None },
+                attributes: FieldAttributes::default(),
                 type_name: "std::path::PathBuf".try_into()?,
                 optional: false,
             },
         ],
-        attributes: ContainerAttributes { rename: None },
+        attributes: ContainerAttributes::default(),
     }];
 
     insta::assert_display_snapshot_matches!("simple_struct", generate_rust(&schemas)?);
@@ -41,9 +41,9 @@ fn plain_enum() -> CliResult {
         name: "Foo".try_into()?,
         variants: vec![PlainEnumVariant {
             name: "Bar".try_into()?,
-            attributes: VariantAttributes { rename: None },
+            attributes: VariantAttributes::default(),
         }],
-        attributes: ContainerAttributes { rename: None },
+        attributes: ContainerAttributes::default(),
     }];
 
     insta::assert_display_snapshot_matches!("plain_enum", generate_rust(&schemas)?);
@@ -60,18 +60,18 @@ fn data_enum() -> CliResult {
         variants: vec![
             DataEnumVariant {
                 name: "Bar".try_into()?,
-                attributes: VariantAttributes { rename: None },
+                attributes: VariantAttributes::default(),
                 fields: DataEnumFields::Named {
                     fields: vec![
                         StructField {
                             name: "one".try_into()?,
-                            attributes: FieldAttributes { rename: None },
+                            attributes: FieldAttributes::default(),
                             type_name: "String".try_into()?,
                             optional: false,
                         },
                         StructField {
                             name: "two".try_into()?,
-                            attributes: FieldAttributes { rename: None },
+                            attributes: FieldAttributes::default(),
                             type_name: "std::path::PathBuf".try_into()?,
                             optional: false,
                         },
@@ -80,13 +80,13 @@ fn data_enum() -> CliResult {
             },
             DataEnumVariant {
                 name: "Baz".try_into()?,
-                attributes: VariantAttributes { rename: None },
+                attributes: VariantAttributes::default(),
                 fields: DataEnumFields::Unnamed {
                     fields: vec!["std::borrow::Cow<'static, str>".try_into()?],
                 },
             },
         ],
-        attributes: ContainerAttributes { rename: None },
+        attributes: ContainerAttributes::default(),
     }];
 
     insta::assert_display_snapshot_matches!("data_enum", generate_rust(&schemas)?);

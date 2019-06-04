@@ -50,17 +50,18 @@ pub struct TypeName {
     pub ident: syn::Type,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContainerAttributes {
     pub rename: Option<String>,
+    pub untagged: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct VariantAttributes {
     pub rename: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FieldAttributes {
     pub rename: Option<String>,
 }

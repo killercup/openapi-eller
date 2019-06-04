@@ -1,0 +1,40 @@
+---
+created: "2019-06-04T13:15:35.162936Z"
+creator: insta@0.8.1
+source: src/generate/rust/schema/test_schema.rs
+expression: "crate::generate::rust::types(&api).unwrap()"
+---
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "Dolor")]
+pub struct Dolor {
+    #[serde(rename = "dolor")]
+    dolor: Option<bool>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "Foo")]
+pub struct Foo {
+    #[serde(rename = "bar")]
+    bar: Option<FooBar>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FooBar {
+    Variant0(Lorem),
+    Variant1(Ipsum),
+    Variant2(Dolor),
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "Ipsum")]
+pub struct Ipsum {
+    #[serde(rename = "ipsum")]
+    ipsum: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "Lorem")]
+pub struct Lorem {
+    #[serde(rename = "lorem")]
+    lorem: Option<u64>,
+}
+

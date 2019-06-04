@@ -102,3 +102,45 @@ fn schema_ref() {
         crate::generate::rust::types(&api).unwrap()
     );
 }
+
+const SCHEMA_ONE_OF: &str = "
+openapi: 3.0.1
+info: { title: Foo, version: 0.1.0 }
+paths: {}
+components:
+    schemas:
+        Foo:
+            type: object
+            properties:
+                bar:
+                    oneOf:
+                        - $ref: '#/components/schemas/Lorem'
+                        - $ref: '#/components/schemas/Ipsum'
+                        - $ref: '#/components/schemas/Dolor'
+        Lorem:
+            type: object
+            properties:
+                lorem:
+                    type: integer
+        Ipsum:
+            type: object
+            properties:
+                ipsum:
+                    type: string
+        Dolor:
+            type: object
+            properties:
+                dolor:
+                    type: boolean
+";
+
+// FIXME: Ref schema name spaces!
+#[test]
+fn schema_one_of() {
+    let api: openapiv3::OpenAPI = serde_yaml::from_str(SCHEMA_ONE_OF).unwrap();
+
+    insta::assert_display_snapshot_matches!(
+        "schema_one_of",
+        crate::generate::rust::types(&api).unwrap()
+    );
+}

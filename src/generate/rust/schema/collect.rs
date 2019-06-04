@@ -1,8 +1,8 @@
 use super::{
     impls,
     types::{
-        ContainerAttributes, FieldAttributes, PlainEnumVariant, RustType, StructField, TypeIdent,
-        TypeName, VariantAttributes,
+        ContainerAttributes, DataEnumFields, DataEnumVariant, FieldAttributes, PlainEnumVariant,
+        RustType, StructField, TypeIdent, TypeName, VariantAttributes,
     },
 };
 use crate::{
@@ -17,7 +17,6 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
     convert::{TryFrom, TryInto},
     str::FromStr,
-    sync::Arc,
 };
 
 type Types = BTreeMap<String, RustType>;
@@ -60,7 +59,7 @@ fn build_struct_schema(
     let t = RustType::Struct {
         name: TypeIdent::try_from(schema_name).context(TemplateError)?,
         fields,
-        attributes: ContainerAttributes { rename },
+        attributes: ContainerAttributes { rename, ..ContainerAttributes::default() },
     };
     let name = t.name();
     match types.entry(name.clone()) {
@@ -112,13 +111,13 @@ fn build_nested_schema(
             log::trace!("nested object {:?}", obj);
             if obj.properties.is_empty() {
                 match &obj.additional_properties {
-                    Some(AdditionalProperties::Any(any)) => {
+                    Some(AdditionalProperties::Any(_any)) => {
                         "std::collections::BTreeMap<String, serde_json::Value>".to_owned()
                     }
                     Some(AdditionalProperties::Schema(schema)) => {
                         let value_type_name = match &**schema {
                             ReferenceOr::Reference { reference, .. } => {
-                                type_name_from_ref(&reference)?
+                                type_name_from_ref(&reference)?.ident.to_string()
                             }
                             ReferenceOr::Item(schema) => build_nested_schema(
                                 &name,
@@ -138,7 +137,9 @@ fn build_nested_schema(
         }
         SchemaKind::Type(Type::Array(ArrayType { items, .. })) => {
             let nested_schema_name = match items {
-                ReferenceOr::Reference { reference, .. } => type_name_from_ref(&reference)?,
+                ReferenceOr::Reference { reference, .. } => {
+                    type_name_from_ref(&reference)?.ident.to_string()
+                }
                 ReferenceOr::Item(schema) => {
                     build_nested_schema(parent_name, schema_name, &schema, source, &mut types)?
                 }
@@ -146,6 +147,43 @@ fn build_nested_schema(
             format!("Vec<{}>", nested_schema_name)
         }
         SchemaKind::Type(Type::Boolean { .. }) => "bool".to_owned(),
+        SchemaKind::OneOf { one_of } => {
+            let name = TypeIdent::try_from(name.as_str()).context(TemplateError)?;
+            let n = name.ident.to_string();
+            let t = RustType::DataEnum {
+                name,
+                variants: one_of
+                    .iter()
+                    .enumerate()
+                    .map(|(i, r)| {
+                        let variant_name = format!("Variant{}", i);
+                        let nested_schema_name = match r {
+                            ReferenceOr::Reference { reference, .. } => {
+                                type_name_from_ref(&reference)?.ident.to_string()
+                            }
+                            ReferenceOr::Item(schema) => {
+                                build_nested_schema(&n, &variant_name, &schema, source, &mut types)?
+                            }
+                        };
+                        Ok(DataEnumVariant {
+                            name: TypeIdent::try_from(variant_name.as_str())
+                                .context(TemplateError)?,
+                            attributes: VariantAttributes::default(),
+                            fields: DataEnumFields::Unnamed {
+                                fields: vec![TypeName::try_from(nested_schema_name.as_str())
+                                    .context(TemplateError)?],
+                            },
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?,
+                attributes: ContainerAttributes {
+                    untagged: true,
+                    ..ContainerAttributes::default()
+                },
+            };
+            types.insert(n.clone(), t);
+            n
+        }
         x => {
             // return Err(Error::Unimplemented { info: format!("schema type {:?}", x) })
             log::debug!("schema type {:?} is unimplemented!", x);
@@ -154,11 +192,11 @@ fn build_nested_schema(
     })
 }
 
-fn type_name_from_ref(r: &str) -> Result<String, Error> {
+fn type_name_from_ref(r: &str) -> Result<TypeIdent, Error> {
     let reference = JsonPointer::from_str(&r).context(InvalidJsonPointer)?;
 
     match &reference.components()[..] {
-        &["components", "schemas", name] => Ok(name.to_string()),
+        &["components", "schemas", name] => Ok(TypeIdent::try_from(name).context(TemplateError)?),
         _ => return Err(Error::UnsupportedReference { reference: reference.clone() }),
     }
 }
@@ -193,7 +231,7 @@ fn nested_string_enum(name: &str, variants: &[String]) -> Result<RustType, Error
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?,
-        attributes: ContainerAttributes { rename: None },
+        attributes: ContainerAttributes::default(),
     })
 }
 

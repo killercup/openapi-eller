@@ -12,6 +12,14 @@ impl RustType {
             | RustType::Struct { name, .. } => (name.ident.to_string()),
         }
     }
+
+    pub fn type_name(&self) -> TypeIdent {
+        match self {
+            RustType::PlainEnum { name, .. }
+            | RustType::DataEnum { name, .. }
+            | RustType::Struct { name, .. } => (name.clone()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Snafu)]
@@ -191,6 +199,11 @@ impl ToTokens for ContainerAttributes {
         if let Some(rename) = &self.rename {
             attrs.push(quote! {
                 #[serde(rename = #rename)]
+            });
+        }
+        if self.untagged {
+            attrs.push(quote! {
+                #[serde(untagged)]
             });
         }
         tokens.append_all(attrs)
