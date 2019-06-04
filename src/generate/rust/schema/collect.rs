@@ -151,7 +151,7 @@ fn struct_field(
     Ok(StructField {
         name: name.try_into().context(TemplateError)?,
         type_name: TypeName::try_from(type_name.as_str()).context(TemplateError)?,
-        attributes: FieldAttributes { rename: None },
+        attributes: FieldAttributes { rename: Some(name.to_string()) },
         optional,
     })
 }
