@@ -30,11 +30,3 @@ insta = "0.8.1"
 [features]
 default = ["rust"]
 rust = ["proc-macro2", "quote", "syn", "heck"]
-
-[replace]
-"serde_yaml:0.8.9" = { path = "vendor/serde-yaml" }
-"serde:1.0.92" = { path = "vendor/serde/serde" }
-"serde_derive:1.0.92" = { path = "vendor/serde/serde_derive" }
-# "strum_macros:0.15.0" = { path = "vendor/strum/strum_macros" }
-# "strum:0.15.0" = { path = "vendor/strum/strum" }
-"openapiv3:0.2.0" = { path = "vendor/openapiv3" }
